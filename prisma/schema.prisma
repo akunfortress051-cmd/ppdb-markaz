@@ -7,6 +7,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Divisi {
+  id          String    @id @default(uuid())
+  nama        String    @unique
+  slug        String    @unique
+  deskripsi   String?
+  tagline     String?
+  warna       String    @default("gold")
+  isActive    Boolean   @default(true)
+  urutan      Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  programs    Program[]
+  sakans      Sakan[]
+  users       User[]
+  dufahs      Dufah[]
+}
+
 model Sakan {
   id        String   @id @default(uuid())
   nama      String
@@ -14,6 +32,8 @@ model Sakan {
   isLocked  Boolean  @default(false)
   createdAt DateTime @default(now())
   kamar     Kamar[]
+  divisiId  String?
+  divisi    Divisi?  @relation(fields: [divisiId], references: [id])
 }
 
 model Kamar {
@@ -79,6 +99,8 @@ model Dufah {
   riwayat              RiwayatDufah[]
   transaksiPendaftaran TransaksiPendaftaran[]
   Rombongan            Rombongan[]
+  divisiId             String?
+  divisi               Divisi?                @relation(fields: [divisiId], references: [id])
 }
 
 model RiwayatDufah {
@@ -121,6 +143,8 @@ model User {
   transaksiDiverifikasi TransaksiPendaftaran[]
   role                  Role                   @relation(fields: [roleId], references: [id])
   Rombongan             Rombongan[]
+  divisiId              String?
+  divisi                Divisi?                @relation(fields: [divisiId], references: [id])
 }
 
 model Role {
@@ -172,6 +196,8 @@ model Program {
   tanggalMulaiDefault String?
   tanggalTutupDefault String?
   transaksi           TransaksiPendaftaran[]
+  divisiId            String?
+  divisi              Divisi?                @relation(fields: [divisiId], references: [id])
 }
 
 model TransaksiPendaftaran {

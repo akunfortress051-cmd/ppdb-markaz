@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     const allDufahs = await prisma.dufah.findMany({ orderBy: { id: 'asc' } });
     const now = new Date();
-    
+
     // Cari Dufah yang rentang pendaftarannya mencakup waktu saat ini
     const targetDufah = allDufahs.find(df => {
       if (!df.tanggalBuka || !df.tanggalTutup) return false;
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     const nominalProgram = isKlaimPaket ? 0 : (isBeliAtribut ? program.harga : Math.max(0, program.harga - 100000));
     const kodeUnik = isKlaimPaket ? 0 : (Math.floor(Math.random() * 900) + 100);
     const totalTagihan = nominalProgram + kodeUnik;
-    
+
     const statusPembayaran = isKlaimPaket ? "KLAIM_PAKET" : "PENDING";
     const waktuLunas = isKlaimPaket ? new Date() : null;
 

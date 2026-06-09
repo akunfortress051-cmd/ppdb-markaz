@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { checkPermission } from "@/lib/checkPermission";
 import bcrypt from "bcrypt";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 
 export async function GET(req: NextRequest) {
@@ -9,7 +11,19 @@ export async function GET(req: NextRequest) {
   if (!auth.allowed) return NextResponse.json({ error: auth.reason }, { status: 403 });
 
   try {
+    const { searchParams } = new URL(req.url);
+    const session = await getServerSession(authOptions);
+    const userDivisiId = (session?.user as any)?.divisiId;
+    const queryDivisiId = searchParams.get("divisiId");
+    const filterDivisiId = userDivisiId || queryDivisiId;
+
+    const whereClause: any = {};
+    if (filterDivisiId && filterDivisiId !== 'ALL') {
+      whereClause.divisiId = filterDivisiId;
+    }
+
     const users = await prisma.user.findMany({
+      where: whereClause,
       include: {
         role: true
       },
@@ -23,6 +37,7 @@ export async function GET(req: NextRequest) {
       username: u.username,
       roleId: u.role.id,
       roleName: u.role.nama,
+      divisiId: u.divisiId,
     }));
 
     return NextResponse.json(safeUsers);
@@ -37,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { nama, username, password, roleId } = body;
+    const { nama, username, password, roleId, divisiId } = body;
 
     if (!nama || !username || !password || !roleId) {
       return NextResponse.json({ error: "Semua field harus diisi" }, { status: 400 });
@@ -53,7 +68,8 @@ export async function POST(req: NextRequest) {
         nama,
         username,
         password: hashedPassword,
-        roleId
+        roleId,
+        divisiId: divisiId || null
       }
     });
 
@@ -71,7 +87,7 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, nama, username, password, roleId } = body;
+    const { id, nama, username, password, roleId, divisiId } = body;
 
     if (!id || !nama || !username || !roleId) {
       return NextResponse.json({ error: "Data tidak valid" }, { status: 400 });
@@ -83,7 +99,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Hanya Super Admin yang bisa mengedit akun ini" }, { status: 403 });
     }
 
-    let updateData: any = { nama, username, roleId };
+    let updateData: any = { nama, username, roleId, divisiId: divisiId || null };
 
     if (password && password.trim() !== '') {
       updateData.password = await bcrypt.hash(password, 10);

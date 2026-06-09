@@ -5,26 +5,26 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const session = await getServerSession(authOptions);
+    const userDivisiId = (session?.user as any)?.divisiId;
+    const queryDivisiId = searchParams.get("divisiId");
+    const filterDivisiId = userDivisiId || queryDivisiId;
+
     const dufahAktif = await prisma.dufah.findFirst({ where: { isActive: true } });
     if (!dufahAktif) return NextResponse.json({ data: [], dufahNama: "Tidak ada Duf'ah Aktif" });
 
-    // Cari juga Duf'ah yang sedang buka pendaftaran (berdasarkan tanggal)
-    const now = new Date();
-    const allDufahs = await prisma.dufah.findMany();
-    const dufahTarget = allDufahs.find(df => {
-      if (!df.tanggalBuka || !df.tanggalTutup) return false;
-      return now >= new Date(df.tanggalBuka) && now <= new Date(df.tanggalTutup);
-    });
-
-    // Kumpulkan ID dufah yang relevan
-    // PRIORITAS: Hanya tampilkan yang aktif sekarang agar tidak tercampur dengan calon santri bulan depan.
+    // Kumpulkan ID dufah yang relevan (Aktif Saja)
     const relevantDufahIds = [dufahAktif.id];
 
     const data = await prisma.riwayatDufah.findMany({
       where: {
         dufahId: { in: relevantDufahIds },
+        ...(filterDivisiId && filterDivisiId !== 'ALL' ? {
+          santri: { transaksi: { some: { program: { divisiId: filterDivisiId } } } }
+        } : {}),
         isLunas: true,
         status: { not: "CHECKED_OUT" },
       },

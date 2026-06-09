@@ -9,6 +9,8 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveCo
 import * as XLSX from 'xlsx';
 import { generateRegistrationPdf, generateRombonganInvoicePdf } from "@/app/lib/generateRegistrationPdf";
 import Swal from 'sweetalert2';
+import { useDivisi } from "@/app/providers/DivisiProvider";
+import { formatDufahName } from "@/app/lib/formatDufahName";
 
 const COLORS = ['#22c55e', '#ef4444']; // Green for PAID, Red for PENDING
 
@@ -34,10 +36,13 @@ export default function MejaKeuanganPage() {
   const [filterKategori, setFilterKategori] = useState("ALL"); // "ALL", "BARU", "LAMA"
 
   const pusher = usePusher();
+  const { activeDivisi, isLoading: loadingDivisi } = useDivisi();
 
   const muatData = async () => {
+    if (loadingDivisi) return;
     try {
-      const res = await fetch("/api/pendaftaran");
+      const url = activeDivisi ? `/api/pendaftaran?divisiId=${activeDivisi.id}` : "/api/pendaftaran";
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setTransaksi(data.transaksi || []);
@@ -52,8 +57,10 @@ export default function MejaKeuanganPage() {
   };
 
   useEffect(() => {
-    muatData();
-  }, []);
+    if (!loadingDivisi) {
+      muatData();
+    }
+  }, [activeDivisi, loadingDivisi]);
 
   useEffect(() => {
     if (!pusher) return;
@@ -516,10 +523,10 @@ export default function MejaKeuanganPage() {
       });
 
   const selectedDufahLabel = filterScope === "AKTIF"
-    ? (activeDufah?.nama || targetDufah?.nama || "Duf'ah Aktif")
+    ? formatDufahName(activeDufah?.nama || targetDufah?.nama || "Duf'ah Aktif", activeDivisi?.slug)
     : filterScope === "GLOBAL"
       ? "Semua Data (Global)"
-      : allDufah.find(d => d.id.toString() === filterScope)?.nama || "Duf'ah";
+      : formatDufahName(allDufah.find(d => d.id.toString() === filterScope)?.nama || "Duf'ah", activeDivisi?.slug);
 
   const filteredRombongan = allRombongan.filter(r => {
     // 1. Filter Kategori: Rombongan selalu dianggap BARU
@@ -619,7 +626,7 @@ export default function MejaKeuanganPage() {
     const income = transaksi
       .filter(t => (t.noKwitansi.includes(`-${d.id}-`) || t.noKwitansi.includes(`RENEW-${d.id}-`)) && t.statusPembayaran === "PAID")
       .reduce((acc, t) => acc + t.totalTagihan, 0);
-    return { name: d.nama, Pendapatan: income };
+    return { name: formatDufahName(d.nama, activeDivisi?.slug), Pendapatan: income };
   });
 
   return (
@@ -686,7 +693,7 @@ export default function MejaKeuanganPage() {
               <option value="AKTIF">Duf'ah Aktif Saja</option>
               <option value="GLOBAL">Semua Data (Global)</option>
               {allDufah.map(d => (
-                <option key={d.id} value={d.id.toString()}>{d.nama}</option>
+                <option key={d.id} value={d.id.toString()}>{formatDufahName(d.nama, activeDivisi?.slug)}</option>
               ))}
             </select>
           </div>
@@ -795,7 +802,7 @@ export default function MejaKeuanganPage() {
                   {filteredDaftarUlang.map((d, index) => (
                     <tr key={d.id} className="border-b border-gray-800 hover:bg-dark-900/50 transition-colors">
                       <td className="px-4 py-4 text-center font-bold text-gray-400">{index + 1}</td>
-                      <td className="px-4 py-4 font-bold text-gold-400">{d.dufah?.nama}</td>
+                      <td className="px-4 py-4 font-bold text-gold-400">{formatDufahName(d.dufah?.nama, activeDivisi?.slug)}</td>
                       <td className="px-4 py-4 font-bold text-white">
                         {d.santri?.nama}
                         <div className="text-[10px] text-gray-500 font-mono mt-0.5">NIS: {d.santri?.nis || "-"}</div>
@@ -970,7 +977,7 @@ export default function MejaKeuanganPage() {
                             <div className="text-xs text-gold-500 mt-0.5">{t.program.durasiBulan} Bulan</div>
                             {t.dufahTujuanId && (
                               <div className="text-[10px] font-bold text-blue-400 mt-0.5">
-                                Mulai Aktif: {allDufah.find(d => d.id === t.dufahTujuanId)?.nama || `Duf'ah ${t.dufahTujuanId}`}
+                                Mulai Aktif: {formatDufahName(allDufah.find(d => d.id === t.dufahTujuanId)?.nama || `Duf'ah ${t.dufahTujuanId}`, activeDivisi?.slug)}
                               </div>
                             )}
                           </>

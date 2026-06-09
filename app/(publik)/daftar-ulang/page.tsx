@@ -13,7 +13,10 @@ export default function DaftarUlangPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0); // 0 = Pilih Divisi
+  const [divisiList, setDivisiList] = useState<any[]>([]);
+  const [divisiId, setDivisiId] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [programs, setPrograms] = useState<any[]>([]);
   const [targetDufah, setTargetDufah] = useState<any>(null);
@@ -42,8 +45,25 @@ export default function DaftarUlangPage() {
   }, [status, session, router]);
 
   useEffect(() => {
-    fetch("/api/program").then(res => res.json()).then(data => setPrograms(data.filter((p: any) => p.isActive))).catch(() => { });
-    fetch("/api/dufah").then(res => res.json()).then(data => {
+    fetch("/api/publik/divisi").then(res => res.json()).then(data => {
+      setDivisiList(data);
+      const params = new URLSearchParams(window.location.search);
+      const slugQuery = params.get("divisi");
+      if (slugQuery) {
+        const found = data.find((d: any) => d.slug === slugQuery);
+        if (found) {
+          setDivisiId(found.id);
+          setStep(1);
+        }
+      }
+    }).catch(() => { });
+  }, []);
+
+  useEffect(() => {
+    if (!divisiId) return;
+
+    fetch(`/api/publik/program?divisiId=${divisiId}`).then(res => res.json()).then(data => setPrograms(data.filter((p: any) => p.isActive))).catch(() => { });
+    fetch(`/api/dufah?divisiId=${divisiId}`).then(res => res.json()).then(data => {
       const now = new Date();
       const target = data.find((df: any) => {
         if (!df.tanggalBuka || !df.tanggalTutup) return false;
@@ -54,7 +74,7 @@ export default function DaftarUlangPage() {
       }
       setTargetDufah(target || null);
     }).catch(() => { });
-  }, []);
+  }, [divisiId]);
 
   const handleCariData = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,9 +171,37 @@ export default function DaftarUlangPage() {
         {/* Card Form */}
         <div className="bg-dark-800/80 backdrop-blur-md rounded-3xl p-6 md:p-10 border border-gold-500/20 shadow-2xl relative">
 
-          {/* STEP 0: PILIH JALUR */}
+          {/* STEP 0: PILIH DIVISI */}
+          {step === 0 && (
+            <div className="animate-fadeIn">
+              <h2 className="text-2xl font-bold text-white border-b border-gold-500/10 pb-3 mb-6 text-center">Pilih Divisi Pendaftaran</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {divisiList.map((divisi) => (
+                  <div
+                    key={divisi.id}
+                    onClick={() => {
+                      setDivisiId(divisi.id);
+                      setStep(1);
+                    }}
+                    className={`cursor-pointer border-2 border-dark-900 bg-dark-900 hover:border-${divisi.warna}-500/50 hover:bg-dark-800 rounded-2xl p-6 transition-all text-center group`}
+                  >
+                    <div className={`w-16 h-16 bg-${divisi.warna}-500/10 text-${divisi.warna}-500 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform`}>
+                      <span className="text-2xl font-black">{divisi.nama.charAt(0)}</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">{divisi.nama}</h3>
+                    <p className="text-sm text-gray-400 line-clamp-2">Daftar ulang untuk program {divisi.nama}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 1: PILIH JALUR */}
           {step === 1 && (
             <div className="animate-fadeIn">
+              <button onClick={() => setStep(0)} className="text-gold-500 font-bold mb-4 flex items-center gap-2 hover:text-gold-400 transition">
+                <span>&larr;</span> Ganti Divisi
+              </button>
               <h2 className="text-2xl font-bold text-white border-b border-gold-500/10 pb-3 mb-6">Pilih Jalur Daftar Ulang</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div

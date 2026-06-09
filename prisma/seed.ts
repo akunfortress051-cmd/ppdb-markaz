@@ -65,6 +65,39 @@ async function main() {
   }
 
   console.log('Permissions seeded.')
+
+  // Create default Divisi (Reguler & Turots)
+  const divisiReguler = await prisma.divisi.upsert({
+    where: { slug: 'reguler' },
+    update: { nama: 'Reguler', warna: 'gold' },
+    create: { nama: 'Reguler', slug: 'reguler', warna: 'gold', urutan: 1 },
+  });
+
+  const divisiTurots = await prisma.divisi.upsert({
+    where: { slug: 'turots' },
+    update: { nama: 'Turots', warna: 'gray' },
+    create: { nama: 'Turots', slug: 'turots', warna: 'gray', urutan: 2 },
+  });
+
+  console.log('Divisi seeded.');
+
+  // Assign existing Sakan, Program, Dufah to Reguler if they have no divisiId
+  await prisma.sakan.updateMany({
+    where: { divisiId: null },
+    data: { divisiId: divisiReguler.id }
+  });
+
+  await prisma.program.updateMany({
+    where: { divisiId: null },
+    data: { divisiId: divisiReguler.id }
+  });
+
+  await prisma.dufah.updateMany({
+    where: { divisiId: null },
+    data: { divisiId: divisiReguler.id }
+  });
+
+  console.log('Existing data assigned to Divisi Reguler.');
   
   // Ambil permission all_access untuk Super Admin
   const allAccessPermission = await prisma.permission.findUnique({

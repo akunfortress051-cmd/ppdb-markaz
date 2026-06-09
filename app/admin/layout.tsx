@@ -5,8 +5,10 @@ import Image from "next/image";
 import { ReactNode, useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { PusherProvider } from "../providers/PusherProvider";
+import { DivisiProvider } from "../providers/DivisiProvider";
 import { signOut, useSession } from "next-auth/react";
 import GlobalNotification from "../components/GlobalNotification";
+import DivisiSwitcher from "../components/DivisiSwitcher";
 
 // SVG Icon Components
 const IconChart = () => (
@@ -152,8 +154,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }`;
 
   return (
-    <PusherProvider>
-      <div className="flex h-screen bg-dark-900 bg-luxury-pattern text-foreground">
+    <DivisiProvider>
+      <PusherProvider>
+        <div className="flex h-screen bg-dark-900 bg-luxury-pattern text-foreground">
         {/* Mobile overlay */}
         {sidebarOpen && (
           <div
@@ -312,6 +315,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </div>
 
             <div className="flex items-center gap-2">
+              <DivisiSwitcher />
               <GlobalNotification />
               <div className="w-8 md:hidden" />
             </div>
@@ -322,6 +326,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </main>
         </div>
       </div>
-    </PusherProvider>
+      </PusherProvider>
+    </DivisiProvider>
   );
 }

@@ -91,7 +91,7 @@ const FadeIn = ({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
   );
 };
 
-export default function Home() {
+export default function Home({ divisiSlug }: { divisiSlug?: string }) {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [pengajars, setPengajars] = useState<Pengajar[]>([]);
@@ -99,6 +99,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [targetDufah, setTargetDufah] = useState<any>(null);
+  const [currentDivisi, setCurrentDivisi] = useState<any>(null);
 
   const navLinks = [
     { href: "#beranda", label: "Beranda" },
@@ -113,10 +114,29 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Fetch divisi list to resolve divisiId from divisiSlug
+        let divisiId = "";
+        let divisiName = "";
+        let divisiColor = "";
+        if (divisiSlug) {
+          const divRes = await fetch("/api/publik/divisi");
+          if (divRes.ok) {
+            const divs = await divRes.json();
+            const found = divs.find((d: any) => d.slug === divisiSlug);
+            if (found) {
+              divisiId = found.id;
+              divisiName = found.nama;
+              divisiColor = found.warna;
+              setCurrentDivisi(found);
+            }
+          }
+        }
+
+        const qs = divisiId ? `?divisiId=${divisiId}` : "";
         const [progRes, statRes, dufahRes, pengajarRes] = await Promise.all([
-          fetch("/api/publik/program"),
+          fetch(`/api/publik/program${qs}`),
           fetch("/api/publik/stats"),
-          fetch("/api/dufah"),
+          fetch(`/api/dufah${qs}`),
           fetch("/api/publik/pengajar")
         ]);
         const progData = await progRes.json();
@@ -230,6 +250,9 @@ export default function Home() {
           {navLinks.map(l => <Link key={l.href} href={l.href} className="hover:text-gold-400 transition-all">{l.label}</Link>)}
         </nav>
         <div className="flex items-center gap-3">
+          <Link href={`/pendaftaran${divisiSlug ? `?divisi=${divisiSlug}` : ''}`} className="hidden md:inline-flex px-5 py-2 rounded-full bg-gold-500 text-dark-900 font-bold hover:bg-gold-400 transition-all text-sm shadow-[0_0_15px_rgba(212,175,55,0.4)]">
+            Daftar
+          </Link>
           <Link href="/santri/login" className="hidden md:inline-flex px-5 py-2 rounded-full bg-white/5 border border-white/10 text-gray-300 font-bold hover:border-gold-500/50 transition-all text-sm">
             Login
           </Link>
@@ -254,19 +277,20 @@ export default function Home() {
           </nav>
           <div className="mt-auto flex flex-col gap-3 pt-8 border-t border-white/10">
             <Link href="/santri/login" onClick={() => setSidebarOpen(false)} className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-gray-300 font-bold text-center hover:border-gold-500/50 transition-all">Login Santri</Link>
-            <Link href="/pendaftaran" onClick={() => setSidebarOpen(false)} className="w-full py-3 rounded-xl bg-gold-500 text-black font-bold text-center hover:bg-gold-400 transition-all">Daftar Sekarang</Link>
+            <Link href={`/pendaftaran${divisiSlug ? `?divisi=${divisiSlug}` : ''}`} onClick={() => setSidebarOpen(false)} className="px-5 py-3 rounded-xl bg-gold-500 text-dark-900 font-bold text-center w-full block shadow-[0_0_15px_rgba(212,175,55,0.4)]">Daftar Sekarang</Link>
+            <Link href="/santri/login" onClick={() => setSidebarOpen(false)} className="px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold text-center w-full block mt-3">Portal Santri</Link>
           </div>
         </div>
       </div>
 
-      <main className="relative z-10">
+      <main className="relative z-10 pt-24 md:pt-32 pb-20">
         {/* HERO SECTION */}
         <section id="beranda" className="min-h-screen flex flex-col items-center justify-center text-center px-6 pt-32 pb-20">
 
 
           <FadeIn delay={200}>
             <h2 className="text-3xl sm:text-5xl md:text-8xl font-black mb-6 md:mb-8 tracking-tighter text-white drop-shadow-2xl">
-              PPDB <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold-300 via-gold-500 to-gold-600">Markaz</span> Arabiyah
+              {currentDivisi ? `Divisi ${currentDivisi.nama}` : "PPDB Markaz Arabiyah"}
             </h2>
           </FadeIn>
 
@@ -282,7 +306,7 @@ export default function Home() {
           <FadeIn delay={600}>
             <div className="flex flex-col sm:flex-row gap-4 md:gap-6 items-center justify-center w-full max-w-lg mx-auto">
               <Link
-                href="/daftar-ulang"
+                href={`/daftar-ulang${divisiSlug ? `?divisi=${divisiSlug}` : ''}`}
                 className="group w-full sm:w-auto px-8 md:px-10 py-4 md:py-5 rounded-2xl bg-gold-500 text-black font-black text-base md:text-xl hover:bg-gold-400 hover:scale-105 transition-all shadow-[0_0_40px_rgba(212,175,55,0.4)] flex items-center justify-center gap-3 active:scale-95"
               >
                 Mulai Daftar Ulang
@@ -291,7 +315,7 @@ export default function Home() {
                 </svg>
               </Link>
               <Link
-                href="/pendaftaran"
+                href={`/pendaftaran${divisiSlug ? `?divisi=${divisiSlug}` : ''}`}
                 className="w-full sm:w-auto px-8 md:px-10 py-4 md:py-5 rounded-2xl bg-white/5 border-2 border-white/10 hover:border-gold-500/50 hover:bg-white/10 text-white font-black text-base md:text-xl transition-all flex items-center justify-center gap-3 active:scale-95"
               >
                 Link Pendaftaran

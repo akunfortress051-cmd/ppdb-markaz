@@ -8,6 +8,11 @@ import { authOptions } from "@/lib/auth";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
+    const session = await getServerSession(authOptions);
+    const userDivisiId = (session?.user as any)?.divisiId;
+    const queryDivisiId = searchParams.get("divisiId");
+    const filterDivisiId = userDivisiId || queryDivisiId;
+
     // Default ke BULAN_INI jika tidak ada param
     const filterDufahId = searchParams.get("dufahId") || "BULAN_INI";
 
@@ -32,20 +37,9 @@ export async function GET(request: Request) {
       const specificDufah = await prisma.dufah.findUnique({ where: { id: Number(filterDufahId) } });
       dufahLabel = specificDufah?.nama || "Duf'ah Tidak Diketahui";
     } else {
-      // BULAN_INI: Duf'ah Aktif + Duf'ah Target (yang tanggalBuka/tanggalTutup mencakup bulan ini)
-      const now = new Date();
-      const dufahTarget = allDufahList.find(df => {
-        if (!df.tanggalBuka || !df.tanggalTutup) return false;
-        return now >= new Date(df.tanggalBuka) && now <= new Date(df.tanggalTutup);
-      });
-
+      // BULAN_INI: Hanya Duf'ah Aktif
       relevantDufahIds = [dufahAktif.id];
-      if (dufahTarget && dufahTarget.id !== dufahAktif.id) {
-        relevantDufahIds.push(dufahTarget.id);
-      }
-      dufahLabel = dufahTarget && dufahTarget.id !== dufahAktif.id
-        ? `${dufahAktif.nama} & ${dufahTarget.nama}`
-        : dufahAktif.nama;
+      dufahLabel = dufahAktif.nama;
     }
 
     const whereDufah = relevantDufahIds ? { in: relevantDufahIds } : undefined;
@@ -56,6 +50,9 @@ export async function GET(request: Request) {
       where: {
         ...(whereDufah && { dufahId: whereDufah }),
         lemariId: { not: null },
+        ...(filterDivisiId && filterDivisiId !== 'ALL' ? {
+          lemari: { kamar: { sakan: { divisiId: filterDivisiId } } }
+        } : {}),
         isLunas: true,
         status: { not: "CHECKED_OUT" },
       },

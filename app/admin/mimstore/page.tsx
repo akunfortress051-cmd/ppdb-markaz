@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { usePusher } from "../../providers/PusherProvider";
 import { swalNotif, swalError } from "../../lib/swal";
 import { Protect, usePermissions } from "@/components/Protect";
+import { useDivisi } from "@/app/providers/DivisiProvider";
+import { formatDufahName } from "@/app/lib/formatDufahName";
 import * as XLSX from "xlsx";
 
 // ── SVG Icons ──────────────────────────────────────────────
@@ -124,6 +126,7 @@ export default function MimStorePage() {
 
   const { hasAccess }     = usePermissions();
   const canManageMimstore = hasAccess("manage_mimstore");
+  const { activeDivisi, isLoading: loadingDivisi } = useDivisi();
 
   // Modal
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -160,19 +163,25 @@ export default function MimStorePage() {
 
   // ── Fetch ──────────────────────────────────────────────
   const muatData = async (isBackground = false) => {
+    if (loadingDivisi) return;
     if (!isBackground) setLoading(true);
     try {
-      const res = await fetch("/api/mimstore");
+      const qs = activeDivisi ? `?divisiId=${activeDivisi.id}` : "";
+      const res = await fetch(`/api/mimstore${qs}`);
       if (res.ok) {
         const result = await res.json();
-        setDufahNama(result.dufahNama);
+        setDufahNama(formatDufahName(result.dufahNama, activeDivisi?.slug));
         setData(result.data);
       }
     } catch { }
     if (!isBackground) setLoading(false);
   };
 
-  useEffect(() => { muatData(); }, []);
+  useEffect(() => { 
+    if (!loadingDivisi) {
+      muatData(); 
+    }
+  }, [activeDivisi, loadingDivisi]);
 
   useEffect(() => {
     if (!pusher) return;

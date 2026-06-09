@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { usePusher } from "../../providers/PusherProvider";
 import { swalConfirm, swalSuccess, swalError, swalNotif, swalToast } from "../../lib/swal";
 import { Protect, usePermissions } from "@/components/Protect";
+import { useDivisi } from "@/app/providers/DivisiProvider";
+import { formatDufahName } from "@/app/lib/formatDufahName";
 import Swal from "sweetalert2";
 
 // SVG Icon Components
@@ -56,18 +58,21 @@ export default function MejaIdCardPage() {
   const [filterDufah, setFilterDufah] = useState("BULAN_INI"); // default = santri bulan ini
   const { hasAccess } = usePermissions();
   const canManageIdCard = hasAccess("manage_idcard");
+  const { activeDivisi, isLoading: loadingDivisi } = useDivisi();
 
   const prevAntreanRef = useRef<number | null>(null);
   const pusher = usePusher();
 
   const muatData = async (isBackground = false, dufahFilter?: string) => {
+    if (loadingDivisi) return;
     if (!isBackground) setLoading(true);
     try {
       const param = dufahFilter || filterDufah;
-      const res = await fetch(`/api/id-card?dufahId=${param}`);
+      const qs = activeDivisi ? `&divisiId=${activeDivisi.id}` : "";
+      const res = await fetch(`/api/id-card?dufahId=${param}${qs}`);
       if (res.ok) {
         const data = await res.json();
-        setDufahNama(data.dufahNama);
+        setDufahNama(formatDufahName(data.dufahNama, activeDivisi?.slug));
         setSudahAmbilMurni(data.sudah);
         if (data.daftarDufah) setDaftarDufah(data.daftarDufah);
 
@@ -83,8 +88,10 @@ export default function MejaIdCardPage() {
   };
 
   useEffect(() => {
-    muatData(false, filterDufah);
-  }, [filterDufah]);
+    if (!loadingDivisi) {
+      muatData(false, filterDufah);
+    }
+  }, [filterDufah, activeDivisi, loadingDivisi]);
 
   // Pusher listeners
   useEffect(() => {
@@ -147,14 +154,14 @@ export default function MejaIdCardPage() {
 
     const namaSantri = item.santri.nama;
     const nisSantri = item.santri.nis || "Belum ada";
-    const dufahNama = item.dufah.nama;
+    const dufahNama = formatDufahName(item.dufah.nama, activeDivisi?.slug);
     const lokasiSakan = item.lemari.kamar.sakan.nama;
     const lokasiKamar = item.lemari.kamar.nama;
     const nomorLemari = item.lemari.nomor;
     let batasAktif = dufahNama;
     if (item.santri.batasAktifDufah) {
       const targetDufahObj = daftarDufah.find(d => d.id === item.santri.batasAktifDufah);
-      batasAktif = targetDufahObj ? targetDufahObj.nama : `Duf'ah ${item.santri.batasAktifDufah}`;
+      batasAktif = formatDufahName(targetDufahObj ? targetDufahObj.nama : `Duf'ah ${item.santri.batasAktifDufah}`, activeDivisi?.slug);
     }
     const isBeliAtribut = item.isBeliAtribut;
 
@@ -374,7 +381,7 @@ Wassalamu'alaikum warahmatullahi wabarakatuh`;
               <option value="BULAN_INI">📅 Bulan Ini (Default)</option>
               <option value="ALL">🌐 Semua Duf'ah</option>
               {daftarDufah.map(df => (
-                <option key={df.id} value={String(df.id)}>{df.nama}</option>
+                <option key={df.id} value={String(df.id)}>{formatDufahName(df.nama, activeDivisi?.slug)}</option>
               ))}
             </select>
           </div>

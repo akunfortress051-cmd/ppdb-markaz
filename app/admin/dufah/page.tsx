@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { swalConfirm, swalSuccess, swalError } from "../../lib/swal";
 import { Protect, usePermissions } from "@/components/Protect";
 import Swal from "sweetalert2";
+import { useDivisi } from "@/app/providers/DivisiProvider";
 
 // SVG Icon Components
 const IconCalendar = () => (
@@ -51,21 +52,28 @@ export default function ManajemenDufahPage() {
   const { hasAccess } = usePermissions();
   const isSuperAdmin = hasAccess("all_access");
 
+  const { activeDivisi, isLoading: loadingDivisi } = useDivisi();
+  const isTurots = activeDivisi?.slug === 'turots';
+  const term = isTurots ? 'Marhalah' : "Duf'ah";
+
   const muatData = async () => {
+    if (loadingDivisi) return;
     try {
-      const res = await fetch("/api/dufah");
+      const res = await fetch("/api/dufah?mode=raw");
       if (!res.ok) throw new Error("Respons API bermasalah");
       const data = await res.json();
       setDataDufah(data);
     } catch (error) {
-      console.error("Gagal memuat daftar Duf'ah:", error);
+      console.error(`Gagal memuat daftar ${term}:`, error);
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    muatData();
-  }, []);
+    if (!loadingDivisi) {
+      muatData();
+    }
+  }, [activeDivisi, loadingDivisi]);
 
   const handleCustomFormat = (val: string) => {
     let v = val.replace(/\D/g, "");
@@ -124,22 +132,22 @@ export default function ManajemenDufahPage() {
     const res = await fetch("/api/dufah", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nama: namaBaru, tanggalBuka: parsedBuka, tanggalTutup: parsedTutup }),
+      body: JSON.stringify({ nama: namaBaru, tanggalBuka: parsedBuka, tanggalTutup: parsedTutup, divisiId: activeDivisi?.id }),
     });
 
     if (res.ok) {
-      swalSuccess("Berhasil", "Duf'ah baru berhasil ditambahkan.");
+      swalSuccess("Berhasil", `${term} baru berhasil ditambahkan.`);
       setNamaBaru(""); setTanggalBuka(""); setTanggalTutup("");
       muatData();
     } else {
-      swalError("Gagal membuat Duf'ah");
+      swalError(`Gagal membuat ${term}`);
     }
     setLoading(false);
   };
 
   const setAktif = async (id: number, nama: string) => {
     const result = await swalConfirm(
-      "Aktifkan Duf'ah?",
+      `Aktifkan ${term}?`,
       `PENTING: Mengaktifkan ${nama} akan otomatis menonaktifkan (Auto-CO) semua santri reguler di bulan sebelumnya. Lanjutkan?`
     );
     if (!result.isConfirmed) return;
@@ -150,7 +158,7 @@ export default function ManajemenDufahPage() {
       swalSuccess("Berhasil!", `${nama} berhasil diaktifkan.`);
       muatData();
     } else {
-      swalError("Gagal mengaktifkan Duf'ah");
+      swalError(`Gagal mengaktifkan ${term}`);
     }
     setLoading(false);
   };
@@ -212,7 +220,7 @@ export default function ManajemenDufahPage() {
 
   const hapusDufah = async (id: number, nama: string) => {
     const result = await Swal.fire({
-      title: "Hapus Permanen Duf'ah?",
+      title: `Hapus Permanen ${term}?`,
       html: `Yakin ingin menghapus <b>${nama}</b>? Semua riwayat asrama di bulan ini akan ikut terhapus.<br><br>Ketik <b>${nama}</b> untuk melanjutkan:`,
       input: "text",
       icon: "warning",
@@ -232,10 +240,10 @@ export default function ManajemenDufahPage() {
     setLoading(true);
     const res = await fetch(`/api/dufah/${id}`, { method: "DELETE" });
     if (res.ok) {
-      swalSuccess("Berhasil", "Duf'ah berhasil dihapus.");
+      swalSuccess("Berhasil", `${term} berhasil dihapus.`);
       muatData();
     } else {
-      swalError("Gagal menghapus Duf'ah");
+      swalError(`Gagal menghapus ${term}`);
     }
     setLoading(false);
   };
@@ -244,19 +252,19 @@ export default function ManajemenDufahPage() {
     <Protect permission="manage_dufah" fallback={<div className="p-10 text-center text-red-500 font-bold text-2xl mt-20">Akses Ditolak: Anda tidak memiliki izin untuk mengelola manajemen duf'ah.</div>}>
     <div className="p-4 md:p-8 max-w-5xl mx-auto min-h-screen">
       <div className="mb-8 border-b border-gold-500/10 pb-6">
-        <h1 className="text-3xl font-extrabold text-gold-500">Manajemen Duf&apos;ah</h1>
-        <p className="text-gray-400 mt-1 font-medium">Kelola periode duf&apos;ah dan jadwal pendaftaran santri.</p>
+        <h1 className="text-3xl font-extrabold text-gold-500">Manajemen {term}</h1>
+        <p className="text-gray-400 mt-1 font-medium">Kelola periode pendaftaran santri divisi {activeDivisi?.nama || 'Reguler'}.</p>
       </div>
 
       {/* FORM BUAT DUF'AH BARU */}
       <form onSubmit={simpanDufahBaru} className="bg-dark-800 p-6 rounded-2xl shadow-sm border border-gold-500/20 mb-10">
         <h2 className="text-xl font-bold text-gold-500 mb-4 flex items-center gap-2">
-          <IconCalendar /> Buat Duf&apos;ah / Periode Baru
+          <IconCalendar /> Buat {term} / Periode Baru
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-bold text-gray-300 mb-1">Nama Duf&apos;ah</label>
-            <input type="text" value={namaBaru} onChange={(e) => setNamaBaru(e.target.value)} placeholder="Cth: Duf'ah 15 (Syawal)" className="w-full p-3 border border-dark-900 rounded-xl outline-none focus:ring-1 focus:ring-gold-500/50 bg-dark-900 text-gray-200 placeholder:text-gray-600 shadow-inner" required />
+            <label className="block text-sm font-bold text-gray-300 mb-1">Nama {term}</label>
+            <input type="text" value={namaBaru} onChange={(e) => setNamaBaru(e.target.value)} placeholder={`Cth: ${term} 15 (Syawal)`} className="w-full p-3 border border-dark-900 rounded-xl outline-none focus:ring-1 focus:ring-gold-500/50 bg-dark-900 text-gray-200 placeholder:text-gray-600 shadow-inner" required />
           </div>
           <div>
             <label className="block text-sm font-bold text-gray-300 mb-1">Buka Pendaftaran</label>
@@ -268,7 +276,7 @@ export default function ManajemenDufahPage() {
           </div>
         </div>
         <button type="submit" disabled={loading} className="mt-4 w-full bg-gold-500 text-black font-bold py-3 rounded-xl hover:bg-gold-400 transition-all active:scale-95 shadow-[0_0_15px_rgba(212,175,55,0.3)] disabled:opacity-50">
-          Simpan Duf&apos;ah Baru
+          Simpan {term} Baru
         </button>
       </form>
 
@@ -293,7 +301,7 @@ export default function ManajemenDufahPage() {
                   </div>
                 </td></tr>
               ) : dataDufah.length === 0 ? (
-                <tr><td colSpan={4} className="p-10 text-center text-gray-500 font-medium">Belum ada Duf&apos;ah.</td></tr>
+                <tr><td colSpan={4} className="p-10 text-center text-gray-500 font-medium">Belum ada {term}.</td></tr>
               ) : (
                 dataDufah.map((dufah) => (
                   <tr key={dufah.id} className={`border-b border-gold-500/5 hover:bg-dark-900/50 transition ${dufah.isActive ? 'bg-green-900/10' : ''}`}>
@@ -354,12 +362,12 @@ export default function ManajemenDufahPage() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-dark-800 border border-gold-500/20 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" style={{ animation: 'scaleIn 0.2s ease-out' }}>
             <div className="bg-dark-900 border-b border-gold-500/10 p-5">
-              <h2 className="text-xl font-bold text-gold-500 flex items-center gap-2"><IconEdit /> Edit Jadwal Duf&apos;ah</h2>
+              <h2 className="text-xl font-bold text-gold-500 flex items-center gap-2"><IconEdit /> Edit Jadwal {term}</h2>
             </div>
             
             <form onSubmit={simpanEdit} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-bold text-gray-300 mb-1">Nama Duf&apos;ah</label>
+                <label className="block text-sm font-bold text-gray-300 mb-1">Nama {term}</label>
                 <input type="text" value={editNama} onChange={(e) => setEditNama(e.target.value)} className="w-full p-3 border border-dark-900 rounded-xl outline-none focus:ring-1 focus:ring-gold-500/50 bg-dark-900 text-gray-200 shadow-inner" required />
               </div>
               <div>

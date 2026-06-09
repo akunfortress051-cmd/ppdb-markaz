@@ -1,38 +1,47 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
-
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    const { searchParams } = new URL(request.url);
+    
+    // 1. Cek Admin Divisi
+    let userDivisiId = (session?.user as any)?.divisiId;
+    const queryDivisiId = searchParams.get("divisiId");
+    const filterDivisiId = userDivisiId || queryDivisiId;
+
+    const dufahWhereClause: any = { isActive: true };
     // Cari Duf'ah yang sedang berjalan (isActive)
-    const dufahAktif = await prisma.dufah.findFirst({ where: { isActive: true } });
+    const dufahAktif = await prisma.dufah.findFirst({ where: dufahWhereClause });
     
     if (!dufahAktif) {
       return NextResponse.json([]);
     }
 
-    // Cari juga Duf'ah yang sedang buka pendaftaran (berdasarkan tanggal)
-    const now = new Date();
-    const allDufahs = await prisma.dufah.findMany();
-    const dufahTarget = allDufahs.find(df => {
-      if (!df.tanggalBuka || !df.tanggalTutup) return false;
-      return now >= new Date(df.tanggalBuka) && now <= new Date(df.tanggalTutup);
-    });
-
-    // Kumpulkan ID dufah yang relevan (hanya yang AKTIF)
+    // Kumpulkan ID dufah yang relevan (Aktif Saja)
     const relevantDufahIds = [dufahAktif.id];
 
+    const dufahLamaWhere: any = { id: { lt: dufahAktif.id } };
+
     const dufahLama = await prisma.dufah.findFirst({
-      where: { id: { lt: dufahAktif.id } },
+      where: dufahLamaWhere,
       orderBy: { id: 'desc' }
     });
 
-    // Tarik semua data riwayat yang butuh kamar dari dufah aktif DAN dufah target
+    // Tarik semua data riwayat yang butuh kamar dari dufah aktif
     const antrean = await prisma.riwayatDufah.findMany({
       where: {
         dufahId: { in: relevantDufahIds },
         lemariId: null,
-        santri: { isAktif: true },  // Hanya tampilkan santri yang masih aktif
+        santri: { 
+          isAktif: true,
+          ...(filterDivisiId && filterDivisiId !== 'ALL' ? {
+            transaksi: { some: { program: { divisiId: filterDivisiId } } }
+          } : {})
+        },
       },
       include: {
         santri: {

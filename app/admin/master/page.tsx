@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { swalConfirm, swalSuccess, swalError, swalDanger, swalInput } from "../../lib/swal";
 import { usePusher } from "../../providers/PusherProvider";
 import { Protect } from "@/components/Protect";
+import { useDivisi } from "@/app/providers/DivisiProvider";
 
 // SVG Icon Components
 const IconLock = ({ className = "h-3.5 w-3.5" }: { className?: string }) => (
@@ -70,19 +71,26 @@ export default function MasterLokasiPage() {
   const [lemariTujuan, setLemariTujuan] = useState("");
 
   const pusher = usePusher();
+  const { activeDivisi, isLoading: loadingDivisi } = useDivisi();
 
   const muatData = async () => {
+    if (loadingDivisi) return;
     try {
+      const qs = activeDivisi ? `?divisiId=${activeDivisi.id}` : "";
       const [resSakan, resAntrean] = await Promise.all([
-        fetch("/api/sakan"),
-        fetch("/api/asrama/antrean")
+        fetch(`/api/sakan${qs}`),
+        fetch(`/api/asrama/antrean${qs}`)
       ]);
       if (resSakan.ok) setDataSakan(await resSakan.json());
       if (resAntrean.ok) setSantriTanpaKamar(await resAntrean.json());
     } catch (error) { console.error("Gagal memuat data", error); }
   };
 
-  useEffect(() => { muatData(); }, []);
+  useEffect(() => { 
+    if (!loadingDivisi) {
+      muatData(); 
+    }
+  }, [activeDivisi, loadingDivisi]);
 
   useEffect(() => {
     if (!pusher) return;
@@ -99,7 +107,11 @@ export default function MasterLokasiPage() {
 
   const tambahSakan = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true);
-    const res = await fetch("/api/sakan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nama: namaSakan, kategori: kategoriSakan }) });
+    const res = await fetch("/api/sakan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nama: namaSakan, kategori: kategoriSakan, divisiId: activeDivisi?.id }),
+    });
     if (res.ok) { setNamaSakan(""); muatData(); } setLoading(false);
   };
   const tambahKamar = async (e: React.FormEvent) => {

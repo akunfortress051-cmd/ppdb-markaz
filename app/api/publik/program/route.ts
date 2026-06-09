@@ -1,10 +1,18 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const divisiId = searchParams.get("divisiId");
+
+    const whereClause: any = { isActive: true };
+    if (divisiId) {
+      whereClause.divisiId = divisiId;
+    }
+
     const programs = await prisma.program.findMany({
-      where: { isActive: true },
+      where: whereClause,
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(programs);

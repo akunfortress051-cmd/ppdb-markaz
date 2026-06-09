@@ -1,9 +1,11 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
-
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
     const { searchParams } = new URL(request.url);
     const filter = searchParams.get("filter") || "AKTIF";
     const mode = searchParams.get("mode"); // "export" = ambil semua tanpa limit
@@ -14,6 +16,10 @@ export async function GET(request: Request) {
     const kategori = searchParams.get("kategori") || "";
     const bulanKe = searchParams.get("bulanKe") || "";
     const sakan = searchParams.get("sakan") || "";
+
+    let userDivisiId = (session?.user as any)?.divisiId;
+    const queryDivisiId = searchParams.get("divisiId");
+    const filterDivisiId = userDivisiId || queryDivisiId;
 
     // ==========================================
     // 1. FILTER PERIODE DUF'AH
@@ -55,6 +61,13 @@ export async function GET(request: Request) {
     // 3. FILTER PENCARIAN & DROPDOWN (Server-Side)
     // ==========================================
     const additionalFilters: any[] = [];
+
+    // Filter Divisi (Data Isolation)
+    if (filterDivisiId && filterDivisiId !== 'ALL') {
+      additionalFilters.push({
+        transaksi: { some: { program: { divisiId: filterDivisiId } } }
+      });
+    }
 
     // Filter Pencarian Nama
     if (search) {
@@ -112,8 +125,7 @@ export async function GET(request: Request) {
         include: {
           program: true
         },
-        orderBy: { createdAt: 'desc' as const },
-        take: 1
+        orderBy: { createdAt: 'desc' as const }
       }
     };
 

@@ -7,6 +7,8 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Protect, usePermissions } from "@/components/Protect";
 import Swal from "sweetalert2";
+import { useDivisi } from "@/app/providers/DivisiProvider";
+import { formatDufahName } from "@/app/lib/formatDufahName";
 
 // SVG Icon Components
 const IconSearch = () => (
@@ -65,6 +67,7 @@ export default function MasterSantriPage() {
   const [daftarDufah, setDaftarDufah] = useState<any[]>([]);
   const [sakanList, setSakanList] = useState<string[]>([]);
   const { hasAccess } = usePermissions();
+  const { activeDivisi } = useDivisi();
   const canManageSantri = hasAccess("manage_santri");
   const isSuperAdmin = hasAccess("all_access");
   const canEditMasaAktif = hasAccess("edit_masa_aktif") || isSuperAdmin;
@@ -110,7 +113,8 @@ export default function MasterSantriPage() {
   const [bioLoading, setBioLoading] = useState(false);
 
   const muatDaftarDufah = async () => {
-    const res = await fetch("/api/dufah");
+    const qs = activeDivisi ? `?divisiId=${activeDivisi.id}` : "";
+    const res = await fetch(`/api/dufah${qs}`);
     if (res.ok) setDaftarDufah(await res.json());
   };
 
@@ -126,6 +130,7 @@ export default function MasterSantriPage() {
     if (filterBulanKe !== "SEMUA") params.set("bulanKe", filterBulanKe);
     if (filterSakan !== "SEMUA") params.set("sakan", filterSakan);
     if (mode) params.set("mode", mode);
+    if (activeDivisi) params.set("divisiId", activeDivisi.id);
     return params.toString();
   };
 
@@ -163,13 +168,17 @@ export default function MasterSantriPage() {
   }, [keyword]);
 
   useEffect(() => {
-    muatDaftarDufah();
-  }, []);
+    if (activeDivisi) {
+      muatDaftarDufah();
+    }
+  }, [activeDivisi]);
 
   useEffect(() => {
-    setCurrentPage(1);
-    muatDataSantri(1);
-  }, [filterDufah, filterGender, filterKategori, filterBulanKe, filterSakan, debouncedKeyword]);
+    if (activeDivisi) {
+      setCurrentPage(1);
+      muatDataSantri(1);
+    }
+  }, [filterDufah, filterGender, filterKategori, filterBulanKe, filterSakan, debouncedKeyword, activeDivisi]);
 
   const hitungSisaDurasi = (santri: any) => {
     if (santri.kategori === "KSU") return "Tak Terbatas";
@@ -213,7 +222,58 @@ export default function MasterSantriPage() {
 
   const getNamaDufah = (id: number) => {
     const dufah = daftarDufah.find(d => d.id === id);
-    return dufah ? dufah.nama : (id ? `Duf'ah ${id}` : "-");
+    return formatDufahName(dufah ? dufah.nama : (id ? `Duf'ah ${id}` : "-"), activeDivisi?.slug);
+  };
+
+  // Cek apakah santri "Double" divisi
+  const checkIsDouble = (santri: any) => {
+    if (!santri.transaksi || santri.transaksi.length === 0) return false;
+    const divisis = new Set(santri.transaksi.map((t: any) => t.program?.divisiId).filter(Boolean));
+    return divisis.size > 1;
+  };
+
+  const gantiProgram = async (santri: any) => {
+    try {
+      const res = await fetch("/api/program");
+      const programs = await res.json();
+
+      const options: any = {};
+      programs.forEach((p: any) => {
+        options[p.id] = p.nama + (p.divisi ? ` (${p.divisi.nama})` : "");
+      });
+
+      const { value: programId } = await Swal.fire({
+        title: 'Pindah Program / Divisi',
+        text: `Pilih program baru untuk santri ${santri.nama}. Perubahan ini akan mengubah seluruh riwayat transaksinya agar sesuai divisi yang baru.`,
+        input: 'select',
+        inputOptions: options,
+        inputPlaceholder: 'Pilih program',
+        showCancelButton: true,
+        confirmButtonText: 'Simpan Perubahan',
+        cancelButtonText: 'Batal',
+        inputValidator: (value) => {
+          if (!value) return 'Anda harus memilih program!';
+        }
+      });
+
+      if (programId) {
+        setLoading(true);
+        const updateRes = await fetch(`/api/santri/${santri.id}/program`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ programId })
+        });
+        if (updateRes.ok) {
+          swalSuccess("Berhasil", "Program santri berhasil dipindahkan.");
+          muatDataSantri(currentPage);
+        } else {
+          swalError("Gagal memindahkan program.");
+          setLoading(false);
+        }
+      }
+    } catch (e) {
+      swalError("Gagal memuat daftar program.");
+    }
   };
 
   const toggleStatusAktif = async (id: string, nama: string, statusSaatIni: boolean) => {
@@ -821,8 +881,10 @@ export default function MasterSantriPage() {
                 </optgroup>
 
                 <optgroup label="Histori Per Duf'ah">
-                  {daftarDufah.map((d) => (
-                    <option key={d.id} value={d.id}>Riwayat {d.nama}</option>
+                  {daftarDufah.map(d => (
+                    <option key={d.id} value={d.id.toString()}>
+                      {formatDufahName(d.nama, activeDivisi?.slug)}
+                    </option>
                   ))}
                 </optgroup>
               </select>
@@ -972,6 +1034,13 @@ export default function MasterSantriPage() {
                           ) : (
                             <span className="text-gray-500 text-sm italic">-</span>
                           )}
+                          {checkIsDouble(santri) && (
+                            <div className="mt-1">
+                              <span className="px-2 py-0.5 bg-red-900/40 text-red-400 border border-red-500/30 rounded text-[10px] font-bold">
+                                ⚠️ DOUBLE DIVISI
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td className="p-4 text-center font-bold text-gold-400">
                           {hitungSisaDurasi(santri)}
@@ -1033,6 +1102,15 @@ export default function MasterSantriPage() {
                                 className="bg-dark-900 text-gold-500 hover:text-black px-3 py-1.5 rounded-lg hover:bg-gold-500 transition text-xs font-bold border border-gold-500 flex items-center gap-1 shadow-[0_0_10px_rgba(212,175,55,0.2)]"
                               >
                                 <IconEdit /> Lengkapi Data & NIS
+                              </button>
+                            )}
+
+                            {isSuperAdmin && (
+                              <button
+                                onClick={() => gantiProgram(santri)}
+                                className="bg-dark-900 text-purple-400 px-3 py-1.5 rounded-lg hover:bg-purple-500/10 transition text-xs font-bold border border-purple-500/20 flex items-center gap-1"
+                              >
+                                <IconEdit /> Pindah Program
                               </button>
                             )}
 

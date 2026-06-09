@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Protect, usePermissions } from "@/components/Protect";
 import { swalSuccess, swalError } from "@/app/lib/swal";
+import { useDivisi } from "@/app/providers/DivisiProvider";
 
 export default function MasterProgramPage() {
   const [programs, setPrograms] = useState<any[]>([]);
@@ -20,9 +21,13 @@ export default function MasterProgramPage() {
   const [tanggalMulaiDefault, setTanggalMulaiDefault] = useState("10 Juni");
   const [tanggalTutupDefault, setTanggalTutupDefault] = useState("06 Juli");
 
+  const { activeDivisi, isLoading: loadingDivisi } = useDivisi();
+
   const muatData = async () => {
+    if (loadingDivisi) return;
     try {
-      const res = await fetch("/api/program");
+      const url = activeDivisi ? `/api/program?divisiId=${activeDivisi.id}` : "/api/program";
+      const res = await fetch(url);
       if (res.ok) setPrograms(await res.json());
     } catch (e) {
       console.error(e);
@@ -30,8 +35,10 @@ export default function MasterProgramPage() {
   };
 
   useEffect(() => {
-    muatData();
-  }, []);
+    if (!loadingDivisi) {
+      muatData();
+    }
+  }, [activeDivisi, loadingDivisi]);
 
   const resetForm = () => {
     setEditId("");
@@ -64,7 +71,11 @@ export default function MasterProgramPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nama, harga, durasiBulan, isActive, tanggalMulaiDefault, tanggalTutupDefault }),
+      body: JSON.stringify({ 
+        nama, harga, durasiBulan, isActive, 
+        tanggalMulaiDefault, tanggalTutupDefault,
+        divisiId: activeDivisi?.id 
+      }),
     });
 
     setLoading(false);

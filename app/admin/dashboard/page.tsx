@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { usePusher } from "../../providers/PusherProvider";
 import { swalConfirm, swalSuccess, swalError } from "../../lib/swal";
 import { Protect, usePermissions } from "@/components/Protect";
+import { useDivisi } from "@/app/providers/DivisiProvider";
 // SVG Icon Components
 const IconLock = ({ className = "h-3.5 w-3.5" }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 20 20" fill="currentColor">
@@ -62,19 +63,24 @@ export default function DashboardMuasisPage() {
   const { hasAccess } = usePermissions();
   const canLockKamar = hasAccess("lock_kamar");
   const canAssignLemari = hasAccess("assign_lemari");
+  const { activeDivisi, isLoading: loadingDivisi } = useDivisi();
 
   const muatData = useCallback(async (isBackground = false) => {
+    if (loadingDivisi) return;
     if (!isBackground) setLoading(true);
     try {
-      const res = await fetch("/api/sakan");
+      const url = activeDivisi ? `/api/sakan?divisiId=${activeDivisi.id}` : "/api/sakan";
+      const res = await fetch(url);
       if (res.ok) setDataSakan(await res.json());
     } catch (error) {}
     if (!isBackground) setLoading(false);
-  }, []);
+  }, [activeDivisi, loadingDivisi]);
 
   useEffect(() => {
-    muatData();
-  }, []);
+    if (!loadingDivisi) {
+      muatData();
+    }
+  }, [activeDivisi, loadingDivisi]);
 
   // Pusher: listen for data updates
   useEffect(() => {

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { usePusher } from "../../providers/PusherProvider";
 import { swalSuccess, swalError, swalNotif } from "../../lib/swal";
 import { Protect, usePermissions } from "@/components/Protect";
+import { useDivisi } from "@/app/providers/DivisiProvider";
 
 // SVG Icon Components
 const IconLock = ({ className = "h-4 w-4" }: { className?: string }) => (
@@ -50,6 +51,7 @@ export default function MejaAsramaPage() {
   const [filterGenderAntrean, setFilterGenderAntrean] = useState("SEMUA"); // Filter Step 1
   const { hasAccess } = usePermissions();
   const canAssignLemari = hasAccess("assign_lemari");
+  const { activeDivisi, isLoading: loadingDivisi } = useDivisi();
 
   // State Step 2 (Pemilihan Kursi/Lemari)
   const [selectedSantri, setSelectedSantri] = useState<any>(null);
@@ -57,24 +59,26 @@ export default function MejaAsramaPage() {
   const [sakanGenderFilter, setSakanGenderFilter] = useState<string>("BANIN"); // Filter Step 2
   const [selectedLemari, setSelectedLemari] = useState<any>(null);
 
-
-
   const pusher = usePusher();
 
   const muatData = async (isBackground = false) => {
+    if (loadingDivisi) return;
     try {
-      const resLokasi = await fetch("/api/sakan");
-      const resAntrean = await fetch("/api/asrama/antrean");
+      const qs = activeDivisi ? `?divisiId=${activeDivisi.id}` : "";
+      const resLokasi = await fetch(`/api/sakan${qs}`);
+      const resAntrean = await fetch(`/api/asrama/antrean${qs}`);
       if (resLokasi.ok) setDataLokasi(await resLokasi.json());
       if (resAntrean.ok) setAntrean(await resAntrean.json());
 
-      const resIdCard = await fetch("/api/id-card");
+      const resIdCard = await fetch(`/api/id-card${qs}`);
     } catch (error) { }
   };
 
   useEffect(() => {
-    muatData();
-  }, []);
+    if (!loadingDivisi) {
+      muatData();
+    }
+  }, [activeDivisi, loadingDivisi]);
 
   // Listen to generic data updates
   useEffect(() => {

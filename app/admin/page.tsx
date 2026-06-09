@@ -5,11 +5,14 @@ import Link from "next/link";
 import { usePusher } from "../providers/PusherProvider";
 import { swalInfo } from "../lib/swal";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { useDivisi } from "@/app/providers/DivisiProvider";
+import { formatDufahName } from "@/app/lib/formatDufahName";
 
 export default function AdminDashboardHome() {
   const [stats, setStats] = useState<any>(null);
   const [grafikData, setGrafikData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { activeDivisi } = useDivisi();
 
   const [filterTahun, setFilterTahun] = useState("ALL");
   const [filterMulai, setFilterMulai] = useState("");
@@ -135,7 +138,7 @@ export default function AdminDashboardHome() {
         <div className="flex items-center gap-4">
           <div className="text-right hidden md:block">
             <p className="text-sm font-bold text-gray-400">Periode Berjalan:</p>
-            <p className="text-xl font-black text-gold-400">{stats?.dufahNama}</p>
+            <p className="text-xl font-black text-gold-400">{formatDufahName(stats?.dufahNama, activeDivisi?.slug)}</p>
           </div>
           <button onClick={copyLaporanWA} className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-black font-bold py-3 px-6 rounded-xl shadow-[0_0_15px_rgba(34,197,94,0.3)] flex items-center gap-2 transition-all active:scale-95">
             <span className="text-xl">📋</span> Copy Laporan WA

@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/app/lib/rateLimit";
 import { emitDataUpdate, sendGlobalNotification, logActivity } from "@/app/lib/pusherServer";
 import { notifySiakadWebhook } from "@/app/lib/webhook-siakad";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 
 function generateInvoiceNumber(dufahId: number) {
@@ -171,19 +173,45 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    // If request.url is not available (e.g. some internal calls), fallback to empty
+    let filterDivisiId = (session?.user as any)?.divisiId;
+    if (request.url) {
+      const { searchParams } = new URL(request.url);
+      const queryDivisiId = searchParams.get("divisiId");
+      filterDivisiId = filterDivisiId || queryDivisiId;
+    }
+
+    const transaksiWhere: any = {};
+    const dufahWhere: any = {};
+    const rombonganWhere: any = {};
+    const programWhere: any = { isActive: true };
+    const daftarUlangWhere: any = { isLunas: false };
+
+    if (filterDivisiId && filterDivisiId !== 'ALL') {
+      transaksiWhere.program = { divisiId: filterDivisiId };
+      rombonganWhere.transaksi = { some: { program: { divisiId: filterDivisiId } } };
+      programWhere.divisiId = filterDivisiId;
+      daftarUlangWhere.santri = {
+        transaksi: { some: { program: { divisiId: filterDivisiId } } }
+      };
+    }
+
     const transaksi = await prisma.transaksiPendaftaran.findMany({
+      where: transaksiWhere,
       orderBy: { createdAt: "desc" },
       include: {
         santri: true,
-        program: true,
+        program: { include: { divisi: true } },
         admin: { select: { nama: true } },
         rombongan: true
       }
     });
 
     const allRombongan = await prisma.rombongan.findMany({
+      where: rombonganWhere,
       orderBy: { createdAt: "desc" },
       include: {
         admin: { select: { nama: true } },
@@ -198,17 +226,18 @@ export async function GET() {
     });
 
     const programs = await prisma.program.findMany({
-      where: { isActive: true },
+      where: programWhere,
       orderBy: { nama: 'asc' }
     });
 
     const allDufah = await prisma.dufah.findMany({
+      where: dufahWhere,
       orderBy: { id: 'asc' }
     });
 
     // Ambil daftar riwayat santri lama yang belum lunas (isLunas: false)
     const daftarUlang = await prisma.riwayatDufah.findMany({
-      where: { isLunas: false },
+      where: daftarUlangWhere,
       include: {
         santri: true,
         dufah: true

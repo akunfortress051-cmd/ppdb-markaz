@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Protect } from "@/components/Protect"
 import Swal from "sweetalert2"
 import { useRouter } from "next/navigation"
+import { useDivisi } from "@/app/providers/DivisiProvider"
 
 interface User {
   id: string
@@ -11,6 +12,7 @@ interface User {
   username: string
   roleId: string
   roleName: string
+  divisiId?: string | null
 }
 
 interface Role {
@@ -32,17 +34,24 @@ export default function AccountManagementPage() {
     nama: "",
     username: "",
     password: "", // Opsional saat edit
-    roleId: ""
+    roleId: "",
+    divisiId: ""
   })
 
+  const { activeDivisi, isLoading: loadingDivisi, availableDivisi } = useDivisi()
+
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (!loadingDivisi) {
+      fetchData()
+    }
+  }, [activeDivisi, loadingDivisi])
 
   const fetchData = async () => {
+    if (loadingDivisi) return;
     setLoading(true)
     try {
-      const respUser = await fetch("/api/users")
+      const qs = activeDivisi ? `?divisiId=${activeDivisi.id}` : ""
+      const respUser = await fetch(`/api/users${qs}`)
       const dataUser = await respUser.json()
       if (respUser.ok) setUsers(dataUser)
 
@@ -120,7 +129,7 @@ export default function AccountManagementPage() {
   }
 
   const openAddModal = () => {
-    setFormData({ nama: "", username: "", password: "", roleId: roles[0]?.id || "" })
+    setFormData({ nama: "", username: "", password: "", roleId: roles[0]?.id || "", divisiId: "" })
     setIsEditMode(false)
     setIsModalOpen(true)
   }
@@ -132,7 +141,8 @@ export default function AccountManagementPage() {
       nama: user.nama,
       username: user.username,
       password: "", // Dikosongkan, admin bisa isi jika ingin reset password
-      roleId: user.roleId
+      roleId: user.roleId,
+      divisiId: user.divisiId || ""
     })
     setIsModalOpen(true)
   }
@@ -259,6 +269,20 @@ export default function AccountManagementPage() {
                       <option value="" disabled>-- Pilih Role --</option>
                       {roles.map(role => (
                         <option key={role.id} value={role.id}>{role.nama}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-1.5">Akses Divisi <span className="text-xs text-gray-500 font-normal">(Kosongkan untuk Super Admin / Akses Global)</span></label>
+                    <select
+                      value={formData.divisiId}
+                      onChange={(e) => setFormData({...formData, divisiId: e.target.value})}
+                      className="w-full bg-dark-900 border border-gold-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500 appearance-none cursor-pointer"
+                    >
+                      <option value="">-- Akses Semua Divisi (Global) --</option>
+                      {availableDivisi.map(div => (
+                        <option key={div.id} value={div.id}>{div.nama}</option>
                       ))}
                     </select>
                   </div>

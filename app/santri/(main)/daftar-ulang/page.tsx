@@ -9,7 +9,10 @@ import { useSession } from "next-auth/react";
 
 export default function SantriDaftarUlangPage() {
   const { data: session, status } = useSession();
-  const [step, setStep] = useState(2); // Langsung ke step 2
+  const [step, setStep] = useState(1); // 1 = Pilih Divisi
+  const [divisiList, setDivisiList] = useState<any[]>([]);
+  const [divisiId, setDivisiId] = useState("");
+  
   const [loading, setLoading] = useState(false);
   const [programs, setPrograms] = useState<any[]>([]);
   const [targetDufah, setTargetDufah] = useState<any>(null);
@@ -28,8 +31,14 @@ export default function SantriDaftarUlangPage() {
   const [isAgreed, setIsAgreed] = useState(false);
 
   useEffect(() => {
-    fetch("/api/program").then(res => res.json()).then(data => setPrograms(data.filter((p: any) => p.isActive))).catch(() => { });
-    fetch("/api/dufah").then(res => res.json()).then(data => {
+    fetch("/api/publik/divisi").then(res => res.json()).then(data => setDivisiList(data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!divisiId) return;
+
+    fetch(`/api/publik/program?divisiId=${divisiId}`).then(res => res.json()).then(data => setPrograms(data.filter((p: any) => p.isActive))).catch(() => { });
+    fetch(`/api/dufah?divisiId=${divisiId}`).then(res => res.json()).then(data => {
       const now = new Date();
       const target = data.find((df: any) => {
         if (!df.tanggalBuka || !df.tanggalTutup) return false;
@@ -40,7 +49,7 @@ export default function SantriDaftarUlangPage() {
       }
       setTargetDufah(target || null);
     }).catch(() => { });
-  }, []);
+  }, [divisiId]);
 
   useEffect(() => {
     if (status === "authenticated" && session?.user?.username) {
@@ -114,9 +123,37 @@ export default function SantriDaftarUlangPage() {
       </div>
 
       <div className="bg-dark-950 border border-dark-800 p-6 md:p-8 rounded-2xl shadow-sm">
+        {/* STEP 1: PILIH DIVISI */}
+        {step === 1 && santriData && (
+          <div className="animate-fadeIn">
+            <h2 className="text-xl font-bold text-white border-b border-gold-500/10 pb-3 mb-6 text-center">Pilih Divisi Pendaftaran</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {divisiList.map((divisi) => (
+                <div
+                  key={divisi.id}
+                  onClick={() => {
+                    setDivisiId(divisi.id);
+                    setStep(2);
+                  }}
+                  className={`cursor-pointer border-2 border-dark-900 bg-dark-900 hover:border-${divisi.warna}-500/50 hover:bg-dark-800 rounded-2xl p-6 transition-all text-center group`}
+                >
+                  <div className={`w-16 h-16 bg-${divisi.warna}-500/10 text-${divisi.warna}-500 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform`}>
+                    <span className="text-2xl font-black">{divisi.nama.charAt(0)}</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">{divisi.nama}</h3>
+                  <p className="text-sm text-gray-400 line-clamp-2">Lanjutkan ke program {divisi.nama}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* STEP 2: PILIH PROGRAM */}
         {step === 2 && santriData && (
           <div className="space-y-6 animate-fadeIn">
+            <button onClick={() => setStep(1)} className="text-gold-500 font-bold mb-4 flex items-center gap-2 hover:text-gold-400 transition">
+              <span>&larr;</span> Ganti Divisi
+            </button>
             <div className="bg-dark-900 border border-gold-500/30 p-5 rounded-2xl flex items-center gap-4">
               <div className="bg-gold-500/20 text-gold-500 w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl shrink-0">
                 {santriData.nama.charAt(0).toUpperCase()}
@@ -291,9 +328,12 @@ export default function SantriDaftarUlangPage() {
                 <input type="checkbox" id="agreement" checked={isAgreed} onChange={(e) => setIsAgreed(e.target.checked)} className="mt-0.5 w-5 h-5 accent-gold-500 cursor-pointer shrink-0" />
                 <label htmlFor="agreement" className="cursor-pointer text-xs text-gray-400 leading-relaxed"><span className="font-bold text-gray-200">Saya setuju</span> untuk tidak merefund atau mengalihkan pembayaran.</label>
               </div>
-              <button onClick={handleRenew} disabled={loading || !isAgreed || !targetDufah} className="w-full bg-gradient-to-r from-gold-600 to-gold-400 text-black font-extrabold py-3 rounded-xl shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all active:scale-95 disabled:opacity-50 text-sm">
-                {loading ? "Memproses..." : targetDufah ? "Selesaikan Daftar Ulang →" : "Pendaftaran Ditutup"}
-              </button>
+              <div className="flex gap-2 mt-4">
+                <button type="button" onClick={() => setStep(1)} className="px-4 py-3 text-gray-400 hover:text-white transition text-sm font-bold rounded-xl border border-gray-700">← Kembali</button>
+                <button onClick={handleRenew} disabled={loading || !isAgreed || !targetDufah} className="flex-1 bg-gradient-to-r from-gold-600 to-gold-400 text-black font-extrabold py-3 rounded-xl shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all active:scale-95 disabled:opacity-50 text-sm">
+                  {loading ? "Memproses..." : targetDufah ? "Selesaikan Daftar Ulang →" : "Pendaftaran Ditutup"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -13,10 +13,11 @@ const API_KEC = (id: string) => `https://www.emsifa.com/api-wilayah-indonesia/ap
 const API_DESA = (id: string) => `https://www.emsifa.com/api-wilayah-indonesia/api/villages/${id}.json`;
 
 export default function PendaftaranPage() {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0); // Step 0 = Pilih Divisi
   const [loading, setLoading] = useState(false);
 
-  // Data Program
+  // Data
+  const [divisiList, setDivisiList] = useState<any[]>([]);
   const [programs, setPrograms] = useState<any[]>([]);
 
   // State Wilayah
@@ -39,6 +40,7 @@ export default function PendaftaranPage() {
     kecamatanId: "", kecamatanNama: "",
     desaId: "", desaNama: "",
     detailAlamat: "",
+    divisiId: "",
     programId: ""
   });
 
@@ -133,6 +135,20 @@ export default function PendaftaranPage() {
       setTargetDufah(target || null);
     }).catch(() => { });
 
+    fetch("/api/publik/divisi").then(res => res.json()).then(data => {
+      setDivisiList(data);
+      // Auto-select and skip step 0 if slug is provided via query
+      const params = new URLSearchParams(window.location.search);
+      const slugQuery = params.get("divisi");
+      if (slugQuery) {
+        const found = data.find((d: any) => d.slug === slugQuery);
+        if (found) {
+          setFormData(prev => ({ ...prev, divisiId: found.id }));
+          setStep(1); // Jump to Step 1
+        }
+      }
+    }).catch(() => { });
+
     // Load Cache
     const cachedData = localStorage.getItem("ppdb_pendaftaran_data");
     const cachedStep = localStorage.getItem("ppdb_pendaftaran_step");
@@ -147,9 +163,21 @@ export default function PendaftaranPage() {
     }
     if (cachedStep) {
       const s = parseInt(cachedStep, 10);
-      if (!isNaN(s) && s >= 1 && s <= 3) setStep(s);
+      if (!isNaN(s) && s >= 0 && s <= 3) setStep(s);
     }
   }, []);
+
+  // Fetch programs whenever divisiId changes
+  useEffect(() => {
+    if (formData.divisiId) {
+      fetch(`/api/publik/program?divisiId=${formData.divisiId}`)
+        .then(res => res.json())
+        .then(data => setPrograms(data))
+        .catch(() => {});
+    } else {
+      setPrograms([]);
+    }
+  }, [formData.divisiId]);
 
   // Save Cache
   useEffect(() => {
@@ -303,7 +331,7 @@ export default function PendaftaranPage() {
         </div>
 
         {/* Stepper Progress */}
-        {step < 4 && (
+        {step > 0 && step < 4 && (
           <div className="flex justify-between items-center mb-8 relative">
             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-dark-800 rounded-full z-0">
               <div className="h-full bg-gold-500 rounded-full transition-all duration-500" style={{ width: `${((step - 1) / 2) * 100}%` }}></div>
@@ -319,9 +347,36 @@ export default function PendaftaranPage() {
         {/* Card Form */}
         <div className="bg-dark-800/80 backdrop-blur-md rounded-3xl p-6 md:p-10 border border-gold-500/20 shadow-2xl">
 
+          {/* STEP 0: PILIH DIVISI */}
+          {step === 0 && (
+            <div className="space-y-6 animate-fadeIn">
+              <h2 className="text-2xl font-bold text-white border-b border-gold-500/10 pb-3 mb-6 text-center">Pilih Divisi Pendidikan</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {divisiList.map(divisi => (
+                  <button
+                    key={divisi.id}
+                    onClick={() => {
+                      setFormData({ ...formData, divisiId: divisi.id });
+                      setStep(1);
+                    }}
+                    className={`flex flex-col items-center justify-center p-8 rounded-2xl border-2 transition-all hover:-translate-y-1 ${formData.divisiId === divisi.id ? 'border-gold-500 bg-gold-500/10 shadow-[0_0_20px_rgba(212,175,55,0.3)]' : 'border-dark-800 bg-dark-900 hover:border-gold-500/30'}`}
+                  >
+                    <span className="text-2xl font-extrabold text-white mb-2">{divisi.nama}</span>
+                    <span className="text-sm text-gray-400">Pendaftaran Divisi {divisi.nama}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* STEP 1: DATA DIRI */}
           {step === 1 && (
             <div className="space-y-6 animate-fadeIn">
+              {divisiList.length > 0 && (
+                <button onClick={() => setStep(0)} className="text-gold-500 font-bold mb-4 flex items-center gap-2 hover:text-gold-400 transition">
+                  <span>&larr;</span> Kembali Ganti Divisi
+                </button>
+              )}
               <h2 className="text-2xl font-bold text-white border-b border-gold-500/10 pb-3 mb-6">Identitas Santri</h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

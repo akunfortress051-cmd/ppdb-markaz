@@ -15,13 +15,13 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    
+
     // ==========================================
     // 1. AUTENTIKASI SEDERHANA
     // ==========================================
     const apiKey = searchParams.get("key");
     const validKey = process.env.SIAKAD_API_KEY || "markaz-siakad-api-2026";
-    
+
     if (apiKey !== validKey) {
       return NextResponse.json(
         { error: "Unauthorized. Sertakan parameter ?key=YOUR_API_KEY" },
